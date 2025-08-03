@@ -9,3 +9,11 @@ body {
 #board {
     margin: 20px auto;
 }
+
+.square-55d63.highlight {
+    background-color: rgba(255, 255, 0, 0.6) !important;
+}
+
+.square-55d63.check {
+    background-color: rgba(255, 0, 0, 0.6) !important;
+}
