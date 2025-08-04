@@ -15,17 +15,16 @@ RUN pip install --upgrade pip \
 FROM python:3.11-slim
 WORKDIR /app
 
-# Security: create non-root user
-RUN useradd -m chess
-USER chess
-
-# Install wheels built in the previous stage
+# Copy wheels and install them *as root* so they go to the global site-packages
 COPY --from=builder /wheels /wheels
-COPY --from=builder /usr/local/bin/pip /usr/local/bin/pip
 RUN pip install --no-cache-dir /wheels/*
 
 # Copy application source (including static assets & templates)
-COPY --chown=chess . .
+COPY . .
+
+# After everything is in place, drop privileges
+RUN useradd -m chess
+USER chess
 
 # FastAPI listens on $PORT provided by Render/Heroku/etc.
 ENV PORT=8000
