@@ -3,20 +3,58 @@ document.addEventListener('DOMContentLoaded', function() {
     const statusEl = document.getElementById('status');
     const startBtn = document.getElementById('startBtn');
     const playAgainBtn = document.getElementById('playAgainBtn');
+    const createBtn = document.getElementById('createBtn');
+    const joinBtn = document.getElementById('joinBtn');
+    const gameIdInput = document.getElementById('gameIdInput');
     let board = null;
     let playerColor = 'white';
 
-    startBtn.addEventListener('click', () => {
+    const wsBase = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
+    let ws = null;
+    let gameId = null;
+
+    function connectSocket(id) {
+        gameId = id;
         const choice = document.querySelector('input[name="side"]:checked').value;
         if (choice === 'random') playerColor = Math.random() < 0.5 ? 'white' : 'black';
         else playerColor = choice;
 
-        startBtn.style.display = 'none';
+        ws = new WebSocket(`${wsBase}/${gameId}/${playerColor}`);
+
+        ws.onopen = () => dbg('WebSocket open', gameId);
+
+        ws.onmessage = evt => {
+            const msg = JSON.parse(evt.data);
+            if (msg.type === 'init' || msg.type === 'move') {
+                game.load(msg.fen);
+                board && board.position(msg.fen);
+                updateCheckHighlight();
+            }
+            if (msg.type === 'game_over') {
+                setStatus(`Game over: ${msg.result}`);
+            }
+        };
+
+        ws.onclose = () => setStatus('Connection closed');
+
         document.getElementById('controls').style.display = 'none';
         document.getElementById('board-container').style.display = 'block';
-
         initBoard();
-        setStatus('White to move.');
+    }
+
+    createBtn.addEventListener('click', async () => {
+        const res = await fetch('/create');
+        const data = await res.json();
+        gameIdInput.value = data.game_id;
+        document.getElementById('gameIdLabel').textContent = data.game_id;
+        connectSocket(data.game_id);
+    });
+
+    joinBtn.addEventListener('click', () => {
+        const id = gameIdInput.value.trim();
+        if (!id) return alert('Enter Game ID');
+        document.getElementById('gameIdLabel').textContent = id;
+        connectSocket(id);
     });
 
     playAgainBtn.addEventListener('click', () => window.location.reload());
@@ -52,14 +90,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Helpers ------------------------------------------------------------
     const $board = $('#board');
+    // attach a global error/debug logger
+    function dbg(...args) { console.debug('[chess-debug]', ...args); }
+    dbg('JS loaded, waiting for game start');
     let selectedSquare = null;
 
     function clearHighlights() {
-        $board.find('.square-55d63').removeClass('highlight check');
+        // remove highlight classes from every square
+        $board.find('div[data-square]').removeClass('highlight check');
     }
 
     function highlightSquare(square, css = 'highlight') {
-        $(`.square-${square}`).addClass(css);
+        dbg('highlight', square, css);
+        $board.find(`div[data-square='${square}']`).addClass(css);
     }
 
     function promptPromotion() {
@@ -112,18 +155,28 @@ document.addEventListener('DOMContentLoaded', function() {
         const movingPawn = game.get(source)?.type === 'p';
         if (movingPawn && (target[1] === '8' || target[1] === '1')) cfg.promotion = promptPromotion();
 
+        dbg('attempt move', cfg);
         const move = game.move(cfg);
         if (move === null) return 'snapback';
+        dbg('move result', move);
 
         playSound(move);
         updateCheckHighlight();
         showGameResult();
         if (!game.game_over()) setStatus(`${game.turn()==='w' ? 'White' : 'Black'} to move.`);
+
+        // send to server
+        const uci = move.from + move.to + (move.promotion || '');
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'move', uci }));
+        }
     }
 
     // --- Click-to-move logic -------------------------------------------------
-    $board.on('click', '.square-55d63', function () {
+    // single-tap / click handler; using touchend avoids triggering drag, works on mobile
+    $board.on('click touchend', 'div[data-square]', function (e) {
         const square = $(this).attr('data-square');
+        dbg('square tapped', square, 'selected?', !!selectedSquare);
 
         // first click – select piece & highlight moves
         if (!selectedSquare) {
@@ -132,7 +185,9 @@ document.addEventListener('DOMContentLoaded', function() {
             selectedSquare = square;
             clearHighlights();
             highlightSquare(square);
-            game.moves({ square, verbose: true }).forEach(m => highlightSquare(m.to));
+            const moves = game.moves({ square, verbose: true });
+            dbg('legal moves', moves);
+            moves.forEach(m => highlightSquare(m.to));
             return;
         }
 
@@ -148,8 +203,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const movingPawn = game.get(selectedSquare)?.type === 'p';
         if (movingPawn && (square[1] === '8' || square[1] === '1')) cfg.promotion = promptPromotion();
 
+        dbg('attempt move', cfg);
         const move = game.move(cfg);
         if (move === null) return; // illegal
+        dbg('move result', move);
 
         board.position(game.fen());
         selectedSquare = null;
@@ -158,5 +215,10 @@ document.addEventListener('DOMContentLoaded', function() {
         updateCheckHighlight();
         showGameResult();
         if (!game.game_over()) setStatus(`${game.turn()==='w' ? 'White' : 'Black'} to move.`);
+
+        const uci = move.from + move.to + (move.promotion || '');
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'move', uci }));
+        }
     });
 });

@@ -21,6 +21,8 @@ This project implements a complete multiplayer chess system where players can:
   - Special moves (castling, en passant, pawn promotion)
   - Stalemate detection
 - Server-side move validation using python-chess
+- Click-to-move or drag-and-drop piece interaction
+- Instant promotion dialog with choice of **Queen / Rook / Bishop / Knight**
 
 ### 🔄 Real-Time Communication
 - WebSocket-based real-time updates using FastAPI
@@ -33,9 +35,13 @@ This project implements a complete multiplayer chess system where players can:
 - Clean and responsive chess board using chessboard.js
 - Simple and intuitive UI
 - Real-time move updates
-- Game status display
-- Player color indication
+- Game status display (whose turn, check, checkmate, stalemate)
+- Player color indication & pre-game side selection (White, Black, Random)
 - Error notifications
+- Highlight legal destination squares on selection
+- Red highlight on king in check
+- Built-in sounds for move, capture, check, and game end
+- Play-again button to reload a fresh board
 
 ## 🧠 Technology Stack
 
@@ -71,8 +77,10 @@ This project implements a complete multiplayer chess system where players can:
 1. Open the game URL in your browser
 2. Create a new game or join an existing one with a game ID
 3. Wait for an opponent (if creating a new game)
-4. Make moves by clicking and dragging pieces
-5. Watch for real-time updates from your opponent
+4. Make moves by clicking **once** on a piece then on a highlighted square, **or** drag & drop as usual
+5. Choose a promotion piece when a pawn reaches the back rank
+6. Listen for audio cues: move, capture, check, game over
+7. Click **Play Again** to start a new match
 
 ## 🔍 Project Structure
 
@@ -97,3 +105,11 @@ This project is open source and available under the MIT License.
 ## 🤝 Contributing
 
 Contributions, issues, and feature requests are welcome! Feel free to check the issues page.
+
+## 🆕 Recent Updates
+- Added click-to-move controls with legal-move highlighting
+- Added audio feedback (move / capture / check / game end)
+- Added king-in-check red highlight & UI status messages
+- Added side-selection controls and play-again button
+- Fixed pawn promotion sync; now prompts immediately with chosen piece
+- Integrated smooth piece animation speeds
