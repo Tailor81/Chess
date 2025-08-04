@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Realtime Chess Game</title>
-    <link rel="stylesheet" href="../chessboardjs-1.0.0/css/chessboard-1.0.0.min.css">
-    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="/chessboardjs-1.0.0/css/chessboard-1.0.0.min.css">
+    <link rel="stylesheet" href="/static/css/styles.css">
 </head>
 <body>
     <h1>Chess Game</h1>
@@ -12,6 +12,9 @@
         <label><input type="radio" name="side" value="white" checked> White</label>
         <label><input type="radio" name="side" value="black"> Black</label>
         <label><input type="radio" name="side" value="random"> Random</label>
+        Game ID: <input id="gameIdInput" placeholder="Game ID" size="10"> <span id="gameIdLabel" style="font-weight:bold;"></span>
+        <button id="createBtn">Create</button>
+        <button id="joinBtn">Join</button>
         <button id="startBtn">Start Game</button>
         <button id="playAgainBtn" style="display:none;">Play Again</button>
     </div>
@@ -20,8 +23,8 @@
         <div id="board" style="width: 400px"></div>
     </div>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="../chessboardjs-1.0.0/js/chessboard-1.0.0.min.js"></script>
+    <script src="/chessboardjs-1.0.0/js/chessboard-1.0.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-    <script src="js/game.js"></script>
+    <script src="/static/js/game.js"></script>
 </body>
 </html>
