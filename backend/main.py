@@ -49,11 +49,20 @@ class ConnectionManager:
     # Connection lifecycle helpers
     # ------------------------------------------------------------------
 
-    async def connect(self, game_id: str, color: str, ws: WebSocket) -> None:
+    async def connect(self, game_id: str, color: str, ws: WebSocket) -> bool:
+        """Accept *ws* into the room.
+
+        Returns True on success, False if the colour is already taken (connection closed)."""
         await ws.accept()
+        # Prevent two players taking the same colour.
+        if color in self.clients.get(game_id, {}):
+            await ws.close(code=4001)
+            return False
+
         self.clients.setdefault(game_id, {})[color] = ws
         # First player creates the server-authoritative game object.
         self.games.setdefault(game_id, ChessGame())
+        return True
 
     def get_opponent(self, game_id: str, color: str) -> WebSocket | None:
         opp_color = "white" if color == "black" else "black"
@@ -96,7 +105,10 @@ async def game_ws(ws: WebSocket, game_id: str, color: str):
         await ws.close(code=4000)
         return
 
-    await manager.connect(game_id, color, ws)
+    if not await manager.connect(game_id, color, ws):
+        # Duplicate colour – connection already closed.
+        return
+
     game = manager.games[game_id]
 
     # Send initial board state.

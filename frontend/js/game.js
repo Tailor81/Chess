@@ -13,13 +13,28 @@ document.addEventListener('DOMContentLoaded', function() {
     let ws = null;
     let gameId = null;
 
-    function connectSocket(id) {
+    /**
+     * Establish WebSocket for multiplayer.
+     * @param {string} id  Game ID to join
+     * @param {string=} forcedColor  Explicit colour ("white" | "black") if supplied
+     */
+    function connectSocket(id, forcedColor) {
         gameId = id;
-        const choice = document.querySelector('input[name="side"]:checked').value;
-        if (choice === 'random') playerColor = Math.random() < 0.5 ? 'white' : 'black';
-        else playerColor = choice;
+
+        // Determine colour
+        if (forcedColor) {
+            playerColor = forcedColor;
+            dbg('forced colour', playerColor);
+        } else {
+            const choice = document.querySelector('input[name="side"]:checked').value;
+            dbg('radio choice', choice);
+            if (choice === 'random') playerColor = Math.random() < 0.5 ? 'white' : 'black';
+            else playerColor = choice;
+        }
+        dbg('connecting with colour', playerColor);
 
         ws = new WebSocket(`${wsBase}/${gameId}/${playerColor}`);
+        dbg('WS URL', ws.url);
 
         ws.onopen = () => dbg('WebSocket open', gameId);
 
@@ -37,24 +52,64 @@ document.addEventListener('DOMContentLoaded', function() {
 
         ws.onclose = () => setStatus('Connection closed');
 
-        document.getElementById('controls').style.display = 'none';
+        // hide buttons but keep the Game ID label visible
+        document.querySelectorAll('#controls button, #controls input[name="side"]').forEach(el => el.style.display = 'none');
         document.getElementById('board-container').style.display = 'block';
+
+        // create or update a dedicated match info element so ID remains visible
+        let info = document.getElementById('matchInfo');
+        if (!info) {
+            info = document.createElement('div');
+            info.id = 'matchInfo';
+            info.style.margin = '8px 0';
+            info.style.fontWeight = 'bold';
+            document.body.insertBefore(info, document.getElementById('board-container'));
+        }
+        info.textContent = `Game ID: ${gameId} — playing as ${playerColor}`;
+
+        setStatus(`${playerColor.charAt(0).toUpperCase() + playerColor.slice(1)}: waiting for opponent...`);
         initBoard();
     }
 
+    // ------------------------------------------------------------------
+    // UI EVENTS
+    // ------------------------------------------------------------------
     createBtn.addEventListener('click', async () => {
         const res = await fetch('/create');
         const data = await res.json();
         gameIdInput.value = data.game_id;
         document.getElementById('gameIdLabel').textContent = data.game_id;
-        connectSocket(data.game_id);
+        // bigger font and auto-copy to clipboard
+        const label = document.getElementById('gameIdLabel');
+        label.style.fontSize = '1.2em';
+        navigator.clipboard?.writeText(data.game_id).catch(() => {});
+        connectSocket(data.game_id, 'white');
     });
 
     joinBtn.addEventListener('click', () => {
         const id = gameIdInput.value.trim();
         if (!id) return alert('Enter Game ID');
         document.getElementById('gameIdLabel').textContent = id;
-        connectSocket(id);
+        const label = document.getElementById('gameIdLabel');
+        label.style.fontSize = '1.2em';
+        const chosen = document.querySelector('input[name="side"]:checked').value;
+        let joinColor;
+        if (chosen === 'random') joinColor = Math.random() < 0.5 ? 'white' : 'black';
+        else joinColor = chosen;
+
+        // If user unintentionally chose the same as default (white), flip to black
+        if (joinColor === 'white') joinColor = 'black';
+
+        dbg('join button clicked, using colour', joinColor);
+        connectSocket(id, joinColor);
+    });
+
+    startBtn.addEventListener('click', () => {
+        playerColor = document.querySelector('input[name="side"]:checked').value || 'white';
+        document.querySelectorAll('#controls button, #controls input[name="side"], #gameIdInput').forEach(el => el.style.display = 'none');
+        document.getElementById('board-container').style.display = 'block';
+        setStatus('Local game — White to move.');
+        initBoard();
     });
 
     playAgainBtn.addEventListener('click', () => window.location.reload());
@@ -181,7 +236,11 @@ document.addEventListener('DOMContentLoaded', function() {
         // first click – select piece & highlight moves
         if (!selectedSquare) {
             const piece = game.get(square);
-            if (!piece || piece.color !== game.turn()) return;
+            if (!piece) return;
+            const myColor = playerColor === 'white' ? 'w' : 'b';
+            if (game.turn() !== myColor || (myColor === 'w' && piece.color !== 'w') || (myColor === 'b' && piece.color !== 'b')) {
+                return; // not your turn or not your piece
+            }
             selectedSquare = square;
             clearHighlights();
             highlightSquare(square);
